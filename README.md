@@ -14,8 +14,6 @@ The data service is the secure go-between between the outside world sending even
 
 Service is a Spring Boot microservice. Data store is postgres. 
 
-See the [one-sheet](https://docs.google.com/document/d/1UJj75cGNBthEknINNFLu6A8H-_SB-E2OrNvltZNGDlI/edit?usp=sharing) for more context and detail. 
-
 ## how to a build it? 
 
 `mvn clean install` 
@@ -38,10 +36,8 @@ Then you can spin up the data-service from a new terminal thusly
 
 tl'dr - some magic is in this service that automagically exposes the database to GET requests along with the means of using queryDSL to make complex queries. 
 
-see [queryDSL REST API Guide](./querydsl_rest_api_guide.md)
-
 ## where can I get more information? 
 
-This is a PatchFox [turbo](https://gitlab.com/patchfox2/turbo) service. Click the link for more information on what that means and what turbo-charged services provide to both developers and consumers. 
+This is a PatchFox [turbo](https://github.com/patchfox-io/turbo) service. Click the link for more information on what that means and what turbo-charged services provide to both developers and consumers. 
 
 
