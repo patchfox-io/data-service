@@ -29,6 +29,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import io.patchfox.QueryDslHelpers;
 import io.patchfox.data_service.controllers.DatabaseQueryController;
+import io.patchfox.data_service.jdbc.JdbcQueryService;
+import io.patchfox.data_service.dto.DatasetDTO;
+import io.patchfox.data_service.dto.DatasetMetricsDTO;
+import io.patchfox.data_service.dto.DatasourceEventDTO;
+import io.patchfox.data_service.dto.PackageDTO;
+import io.patchfox.data_service.jdbc.JdbcQueryService.EditWithDatasourcePurl;
 import io.patchfox.data_service.repositories.DatasetMetricsRepository;
 import io.patchfox.data_service.repositories.DatasetRepository;
 import io.patchfox.data_service.repositories.DatasourceEventRepository;
@@ -126,6 +132,9 @@ public class DatabaseQueryService {
     @Autowired
     private DatasourceMetricsCurrentRepository datasourceMetricsCurrentRepository;
 
+    @Autowired
+    private JdbcQueryService jdbcQueryService;
+
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -154,12 +163,14 @@ public class DatabaseQueryService {
                               .txid(txid)
                               .requestReceivedAt(requestReceivedAt)
                               .code(HttpStatus.OK.value())
-                              .build();            
-        } 
+                              .build();
+        }
 
-        var editIndexes = dsmRecords.stream()
-                                    .flatMap(dsm -> dsm.getEdits().stream())
-                                    .map(e -> e.getId())
+        // Using JDBC - DatasetMetricsDTO has no edits relationship, load via helper
+        var dsmIds = dsmRecords.stream().map(DatasetMetricsDTO::getId).toList();
+        var editIdsMap = jdbcQueryService.getEditIdsForDatasetMetrics(dsmIds);
+        var editIndexes = editIdsMap.values().stream()
+                                    .flatMap(List::stream)
                                     .map(String::valueOf)
                                     .collect(Collectors.joining(","));
 
@@ -177,10 +188,10 @@ public class DatabaseQueryService {
 
 
     /**
-     * 
+     *
      * this lets you first apply filter criteria against datasetmetrics records then additionally allows you to scope
-     * the query down to a subset of datasources present in those datasetmetrics records. the effect is to take 
-     * what you would get from handleDataestMetricsEditSubQuery and additionally scope things down to only the edits 
+     * the query down to a subset of datasources present in those datasetmetrics records. the effect is to take
+     * what you would get from handleDataestMetricsEditSubQuery and additionally scope things down to only the edits
      * associated with a subset of datasources in the dataset. 
      * 
      * @param txid
@@ -190,23 +201,23 @@ public class DatabaseQueryService {
      * @return
      */
     public ApiResponse handleDatasourceEditSubQuery(
-        UUID txid, 
+        UUID txid,
         ZonedDateTime requestReceivedAt,
-        Map<String, String> params, 
+        Map<String, String> params,
         Pageable pageable
     ) {
 
         var dsmRecords = getDatasetMetrics(txid, requestReceivedAt, params, pageable);
         log.info("got {} dsmRecords back from datasource sub query", dsmRecords.size());
-        if (dsmRecords.isEmpty()) { 
+        if (dsmRecords.isEmpty()) {
             return ApiResponse.builder()
                               .txid(txid)
                               .requestReceivedAt(requestReceivedAt)
                               .code(HttpStatus.OK.value())
                               .data(Map.of())
                               .build();
-        } 
-        // we assume controller has validated this argument is present 
+        }
+        // we assume controller has validated this argument is present
         // this is an Edit obj key, not a DatasetMetrics key so we'll pull it out now
         var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY);
 
@@ -215,26 +226,27 @@ public class DatabaseQueryService {
                                              .filter(s -> !s.isEmpty())
                                              .toList();
 
-        var editIndexes = dsmRecords.stream()
-                                    .flatMap(dsm -> dsm.getEdits().stream())
-                                    .filter(e -> datasourcePurls.stream()
-                                                                .anyMatch(p -> e.getDatasource().getPurl().contains(p))
-                                    )
-                                    .map(Edit::getId)
-                                    .toList();
+        // Using JDBC - DatasetMetricsDTO has no edits relationship, load via helper
+        var dsmIds = dsmRecords.stream().map(DatasetMetricsDTO::getId).toList();
+        var editsWithPurl = jdbcQueryService.getEditsWithDatasourcePurl(dsmIds);
+        var editIndexes = editsWithPurl.stream()
+                                       .filter(ewp -> datasourcePurls.stream()
+                                                                     .anyMatch(p -> ewp.datasourcePurl.contains(p)))
+                                       .map(ewp -> ewp.editId)
+                                       .toList();
 
         log.info("size of editIndexes is: {}", editIndexes.size());
-        
+
 
         var editIndexesAsString = editIndexes.stream()
                                              .map(String::valueOf)
                                              .collect(Collectors.joining(","));
-        
-        // this is a hack to ensure when something doesn't match the datasource parameter 
-        // we don't return ALL edit results 
+
+        // this is a hack to ensure when something doesn't match the datasource parameter
+        // we don't return ALL edit results
         //
-        // also doing this with another trip to the db is ridiculous I know - this is because I want 
-        // the paged and mapped result and don't want to have to make that by hand rn. 
+        // also doing this with another trip to the db is ridiculous I know - this is because I want
+        // the paged and mapped result and don't want to have to make that by hand rn.
         if (editIndexes.isEmpty()) { editIndexesAsString = "-1"; }
         params.put(ID_KEY, editIndexesAsString);
         var mappedResult = getMappedResult(txid, requestReceivedAt, "edit", params, pageable);
@@ -363,23 +375,23 @@ public class DatabaseQueryService {
      * @return
      */
     public ApiResponse handleDatasourcePackageSubQuery(
-        UUID txid, 
+        UUID txid,
         ZonedDateTime requestReceivedAt,
-        Map<String, String> params, 
+        Map<String, String> params,
         Pageable pageable
     ) {
 
         var dsmRecords = getDatasetMetrics(txid, requestReceivedAt, params, pageable);
         log.info("got {} dsmRecords back from datasource sub query", dsmRecords.size());
-        if (dsmRecords.isEmpty()) { 
+        if (dsmRecords.isEmpty()) {
             return ApiResponse.builder()
                               .txid(txid)
                               .requestReceivedAt(requestReceivedAt)
                               .code(HttpStatus.OK.value())
                               .data(Map.of())
                               .build();
-        } 
-        // we assume controller has validated this argument is present 
+        }
+        // we assume controller has validated this argument is present
         // this is an Edit obj key, not a DatasetMetrics key so we'll pull it out now
         var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY);
 
@@ -388,13 +400,14 @@ public class DatabaseQueryService {
                                              .filter(s -> !s.isEmpty())
                                              .toList();
 
-        var commitDateTimes = 
-            dsmRecords.stream()
-                      .flatMap(dsm -> dsm.getEdits().stream())
-                      .filter(e -> datasourcePurls.stream()
-                                                  .anyMatch(p -> e.getDatasource().getPurl().contains(p))
-                      )
-                      .map(e -> e.getCommitDateTime())
+        // Using JDBC - DatasetMetricsDTO has no edits relationship, load via helper
+        var dsmIds = dsmRecords.stream().map(DatasetMetricsDTO::getId).toList();
+        var editsWithPurl = jdbcQueryService.getEditsWithDatasourcePurl(dsmIds);
+        var commitDateTimes = editsWithPurl.stream()
+                      .filter(ewp -> datasourcePurls.stream()
+                                                    .anyMatch(p -> ewp.datasourcePurl.contains(p)))
+                      .map(ewp -> ewp.commitDateTime)
+                      .filter(cdt -> cdt != null)
                       .toList();
 
         var commitDateTimesAsString = commitDateTimes.stream()
@@ -404,19 +417,24 @@ public class DatabaseQueryService {
         params.put(COMMIT_DATE_TIME_KEY, commitDateTimesAsString);
         var mappedResult = getMappedResult(txid, requestReceivedAt, "datasourceEvent", params, pageable);
 
-        
+
         /*
-        you are not wrong. all of this is ridiculous. rn this is the most reliable way to ensure the user's 
-        pagination and sort preferences are respected. 
+        you are not wrong. all of this is ridiculous. rn this is the most reliable way to ensure the user's
+        pagination and sort preferences are respected.
         */
 
-        var packagePurls = 
-            ((Page<DatasourceEvent>)mappedResult.get(TITLE_PAGE_KEY)).getContent()
-                                                                     .stream()
-                                                                     .flatMap(dse -> dse.getPackages().stream())
-                                                                     .map(p -> p.getPurl())
-                                                                     .toList();
+        // Now using JDBC - DatasourceEventDTO has no packages, so we load them separately
+        @SuppressWarnings("unchecked")
+        var dseContent = ((Page<DatasourceEventDTO>)mappedResult.get(TITLE_PAGE_KEY)).getContent();
+        var eventIds = dseContent.stream()
+                                 .map(DatasourceEventDTO::getId)
+                                 .toList();
 
+        // Load package purls for these events via JDBC join table query
+        var packagePurlsMap = jdbcQueryService.getPackagePurlsForDatasourceEvents(eventIds);
+        var packagePurls = packagePurlsMap.values().stream()
+                                          .flatMap(List::stream)
+                                          .toList();
 
         var purlsAsString = packagePurls.stream()
                                         .map(String::valueOf)
@@ -534,22 +552,22 @@ public class DatabaseQueryService {
 
 
     public ApiResponse handleDatasetMetricsDatasourcePackageSubQueryReturnFindingType(
-        UUID txid, 
+        UUID txid,
         ZonedDateTime requestReceivedAt,
-        Map<String, String> params, 
+        Map<String, String> params,
         Pageable pageable
     ) {
         var dsmRecords = getDatasetMetrics(txid, requestReceivedAt, params, pageable);
         log.info("got {} dsmRecords back from datasource sub query", dsmRecords.size());
-        if (dsmRecords.isEmpty()) { 
+        if (dsmRecords.isEmpty()) {
             return ApiResponse.builder()
                               .txid(txid)
                               .requestReceivedAt(requestReceivedAt)
                               .code(HttpStatus.OK.value())
                               .data(Map.of())
                               .build();
-        } 
-        // we assume controller has validated this argument is present 
+        }
+        // we assume controller has validated this argument is present
         // this is an Edit obj key, not a DatasetMetrics key so we'll pull it out now
         var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY);
 
@@ -558,13 +576,14 @@ public class DatabaseQueryService {
                                              .filter(s -> !s.isEmpty())
                                              .toList();
 
-        var commitDateTimes = 
-            dsmRecords.stream()
-                      .flatMap(dsm -> dsm.getEdits().stream())
-                      .filter(e -> datasourcePurls.stream()
-                                                  .anyMatch(p -> e.getDatasource().getPurl().contains(p))
-                      )
-                      .map(e -> e.getCommitDateTime())
+        // Using JDBC - DatasetMetricsDTO has no edits relationship, load via helper
+        var dsmIds = dsmRecords.stream().map(DatasetMetricsDTO::getId).toList();
+        var editsWithPurl = jdbcQueryService.getEditsWithDatasourcePurl(dsmIds);
+        var commitDateTimes = editsWithPurl.stream()
+                      .filter(ewp -> datasourcePurls.stream()
+                                                    .anyMatch(p -> ewp.datasourcePurl.contains(p)))
+                      .map(ewp -> ewp.commitDateTime)
+                      .filter(cdt -> cdt != null)
                       .toList();
 
         var commitDateTimesAsString = commitDateTimes.stream()
@@ -574,19 +593,24 @@ public class DatabaseQueryService {
         params.put(COMMIT_DATE_TIME_KEY, commitDateTimesAsString);
         var mappedResult = getMappedResult(txid, requestReceivedAt, "datasourceEvent", params, pageable);
 
-        
+
         /*
-        you are not wrong. all of this is ridiculous. rn this is the most reliable way to ensure the user's 
-        pagination and sort preferences are respected. 
+        you are not wrong. all of this is ridiculous. rn this is the most reliable way to ensure the user's
+        pagination and sort preferences are respected.
         */
 
-        var packageIndexes = 
-            ((Page<DatasourceEvent>)mappedResult.get(TITLE_PAGE_KEY)).getContent()
-                                                                     .stream()
-                                                                     .flatMap(dse -> dse.getPackages().stream())
-                                                                     .map(p -> p.getId())
-                                                                     .toList();
+        // Now using JDBC - DatasourceEventDTO has no packages, so we load them separately
+        @SuppressWarnings("unchecked")
+        var dseContent = ((Page<DatasourceEventDTO>)mappedResult.get(TITLE_PAGE_KEY)).getContent();
+        var eventIds = dseContent.stream()
+                                 .map(DatasourceEventDTO::getId)
+                                 .toList();
 
+        // Load package IDs for these events via JDBC join table query
+        var packageIdsMap = jdbcQueryService.getPackageIdsForDatasourceEvents(eventIds);
+        var packageIndexes = packageIdsMap.values().stream()
+                                          .flatMap(List::stream)
+                                          .toList();
 
         var packageIndexesAsString = packageIndexes.stream()
                                                    .map(String::valueOf)
@@ -613,10 +637,10 @@ public class DatabaseQueryService {
      * @param pageable
      * @return
      */
-    public List<DatasetMetrics> getDatasetMetrics(
-        UUID txid, 
+    public List<DatasetMetricsDTO> getDatasetMetrics(
+        UUID txid,
         ZonedDateTime requestReceivedAt,
-        Map<String, String> params, 
+        Map<String, String> params,
         Pageable pageable
     ) {
         if (params.containsKey(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY)) {
@@ -635,13 +659,13 @@ public class DatabaseQueryService {
      * @param pageable
      * @return
      */
-    public List<DatasetMetrics> processDatasetMetricsWithSubQueryByDatasource(
-        UUID txid, 
+    public List<DatasetMetricsDTO> processDatasetMetricsWithSubQueryByDatasource(
+        UUID txid,
         ZonedDateTime requestReceivedAt,
-        Map<String, String> params, 
+        Map<String, String> params,
         Pageable pageable
     ) {
-        // we assume controller has validated this argument is present 
+        // we assume controller has validated this argument is present
         // this is an Edit obj key, not a DatasetMetrics key so we'll pull it out now
         var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY);
 
@@ -653,31 +677,18 @@ public class DatabaseQueryService {
         var dsmRecords = processDatasetMetricsWithSubQuery(txid, requestReceivedAt, params, pageable);
 
         if (dsmRecords.isEmpty()) {
-            return new ArrayList<>();             
-        } 
+            return new ArrayList<>();
+        }
 
+        // Using JDBC - DatasetMetricsDTO has datasetId but no datasources relationship
+        // Load datasource purls for each dataset and filter
         return dsmRecords.stream()
-                         .filter(dsm -> dsm.getDataset()
-                                           .getDatasources()
-                                           .stream()
-                                           .anyMatch(
-                                                e -> datasourcePurls.stream().anyMatch(e.getPurl()::contains)
-                                           )
-                         )
+                         .filter(dsm -> {
+                             List<String> dsPurls = jdbcQueryService.getDatasourcePurlsForDataset(dsm.getDatasetId());
+                             return dsPurls.stream()
+                                           .anyMatch(dsPurl -> datasourcePurls.stream().anyMatch(dsPurl::contains));
+                         })
                          .toList();
-
-        // return dsmRecords.stream()
-        //                  .filter(dsm ->
-        //                      dsm.getEdits()
-        //                         .stream()
-        //                         .anyMatch(
-        //                             e -> {
-        //                                 var purl = e.getDatasource().getPurl();
-        //                                 return datasourcePurls.stream().anyMatch(purl::contains);
-        //                             }
-        //                         )
-        //                  )
-        //                  .toList();
     }
 
 
@@ -690,29 +701,30 @@ public class DatabaseQueryService {
      * @param pageable
      * @return
      */
-    public List<DatasetMetrics> processDatasetMetricsWithSubQuery(
-        UUID txid, 
+    @SuppressWarnings("unchecked")
+    public List<DatasetMetricsDTO> processDatasetMetricsWithSubQuery(
+        UUID txid,
         ZonedDateTime requestReceivedAt,
-        Map<String, String> params, 
+        Map<String, String> params,
         Pageable pageable
     ) {
 
-        // we're first going to segregate the params intended for the datasetMetrics table and those intended for 
-        // the package table. 
+        // we're first going to segregate the params intended for the datasetMetrics table and those intended for
+        // the package table.
         var hadCommitDateTimeParam = false;
         var dsmParams = new HashMap<String, String>();
 
         // ensure we sort by commit date time so that we can pull out the most recent record if need be
         dsmParams.put(SORT_KEY, DatabaseQueryController.COMMIT_DATE_TIME_KEY + ".desc");
-        
+
         //
-        // first get the relevant dataset_metrics record 
+        // first get the relevant dataset_metrics record
         // if it's missing then return emtpy response (controller should have handled this)
         //
         var datasetNames = params.getOrDefault(DatabaseQueryController.DATASET_NAME_KEY, "");
 
         if (datasetNames.isEmpty()) {
-            return new ArrayList<>();          
+            return new ArrayList<>();
         } else {
             dsmParams.put("dataset.name", params.remove(DatabaseQueryController.DATASET_NAME_KEY));
         }
@@ -722,56 +734,69 @@ public class DatabaseQueryService {
         //
         if (params.containsKey(DatabaseQueryController.COMMIT_DATE_TIME_KEY)) {
             dsmParams.put(
-                DatabaseQueryController.COMMIT_DATE_TIME_KEY, 
+                DatabaseQueryController.COMMIT_DATE_TIME_KEY,
                 params.remove(DatabaseQueryController.COMMIT_DATE_TIME_KEY)
-            );   
+            );
             hadCommitDateTimeParam = true;
-        } 
+        }
 
 
         //
-        // add flag(s) 
-        // 
+        // add flag(s)
+        //
         if (params.containsKey(DatabaseQueryController.IS_CURRENT_KEY)) {
-            dsmParams.put(DatabaseQueryController.IS_CURRENT_KEY, params.remove(DatabaseQueryController.IS_CURRENT_KEY)); 
-        }    
-        
+            dsmParams.put(DatabaseQueryController.IS_CURRENT_KEY, params.remove(DatabaseQueryController.IS_CURRENT_KEY));
+        }
+
         if (params.containsKey(DatabaseQueryController.IS_FORECAST_SAME_COURSE_KEY)) {
             dsmParams.put(
-                DatabaseQueryController.IS_FORECAST_SAME_COURSE_KEY, 
+                DatabaseQueryController.IS_FORECAST_SAME_COURSE_KEY,
                 params.remove(DatabaseQueryController.IS_FORECAST_SAME_COURSE_KEY)
-            ); 
+            );
 
-        } 
+        }
 
         if (params.containsKey(DatabaseQueryController.IS_FORECAST_RECOMMENDATIONS_TAKEN_KEY)) {
             dsmParams.put(
-                DatabaseQueryController.IS_FORECAST_RECOMMENDATIONS_TAKEN_KEY, 
+                DatabaseQueryController.IS_FORECAST_RECOMMENDATIONS_TAKEN_KEY,
                 params.remove(DatabaseQueryController.IS_FORECAST_RECOMMENDATIONS_TAKEN_KEY)
-            ); 
+            );
 
-        } 
+        }
 
 
-        // ultimately it's the spring Pageable object that's spring is going to use to determine sort and page size 
-        // we added a sort argument to dsmParams expecting method getMappedResult(...) to handle the mapping therin 
+        // ultimately it's the spring Pageable object that's spring is going to use to determine sort and page size
+        // we added a sort argument to dsmParams expecting method getMappedResult(...) to handle the mapping therin
         try {
-            // var dsmMappedResult = getMappedResult(txid, requestReceivedAt, "datasetMetrics", dsmParams, pageable);
-            // var dsmPage = (Page<DatasetMetrics>) dsmMappedResult.get(TITLE_PAGE_KEY);
-            // var dsmRecords = dsmPage.getContent();
- 
+            // If no commitDateTime specified, we only need the most recent record - use LIMIT 1
+            // This avoids loading 200k+ records just to take the first one
+            if (!hadCommitDateTimeParam) {
+                Pageable dsmPageable = PageRequest.of(0, 1); // Just get 1 record
+                var dsmMappedResult = getMappedResult(txid, requestReceivedAt, "datasetMetrics", dsmParams, dsmPageable);
+                @SuppressWarnings("unchecked")
+                var dsmPage = (Page<DatasetMetricsDTO>) dsmMappedResult.get(TITLE_PAGE_KEY);
+                var content = dsmPage.getContent();
+                if (content == null || content.isEmpty()) {
+                    return new ArrayList<>();
+                }
+                log.info("dsmRecordId is: {}", content.get(0).getId());
+                return new ArrayList<>(content);
+            }
+
+            // When commitDateTime IS specified, we may need multiple records
             // Use a dedicated pageable for the DSM stage.
             // Keep caller's page size if present; otherwise choose something reasonable.
             int pageSize = pageable != null && !pageable.isUnpaged() ? pageable.getPageSize() : 200;
             int pageNum = 0;
 
-            List<DatasetMetrics> dsmRecords = new ArrayList<>();
+            List<DatasetMetricsDTO> dsmRecords = new ArrayList<>();
 
             while (true) {
                 Pageable dsmPageable = PageRequest.of(pageNum, pageSize); // sort handled by dsmParams -> getMappedResult()
 
                 var dsmMappedResult = getMappedResult(txid, requestReceivedAt, "datasetMetrics", dsmParams, dsmPageable);
-                var dsmPage = (Page<DatasetMetrics>) dsmMappedResult.get(TITLE_PAGE_KEY);
+                @SuppressWarnings("unchecked")
+                var dsmPage = (Page<DatasetMetricsDTO>) dsmMappedResult.get(TITLE_PAGE_KEY);
 
                 var content = dsmPage.getContent();
                 if (content == null || content.isEmpty()) {
@@ -785,11 +810,6 @@ public class DatabaseQueryService {
                 }
 
                 pageNum++;
-            }            
-
-            if ( !hadCommitDateTimeParam && !dsmRecords.isEmpty() ) {
-                dsmRecords = List.of(dsmRecords.get(0));
-                log.info("dsmRecordId is: {}", dsmRecords.get(0).getId());
             }
 
             return dsmRecords;
@@ -865,338 +885,113 @@ public class DatabaseQueryService {
             var titlePageName = TITLE_PAGE_KEY;
             switch (table.toUpperCase()) {
                 case "DATASETMETRICS":
-                    var builder = queryDslHelpers.getBuilder(params, QDatasetMetrics.datasetMetrics, DatasetMetrics.class);
-                    var dsmPage = datasetMetricsRepository.findAll(builder, pageable);
-
-                    // to prevent recursive references that cause things to go boom
-                    dsmPage.stream()
-                        .forEach(
-                                dsm -> {
-                                    if (dsm.getDataset() == null) {
-                                        log.warn("null dataset field for dsm record id is: {}", dsm.getId());
-                                        log.warn("dsmId={}, dsmClass={}, datasetLoaded={}, sessionLoadedEntity={}",
-                                            dsm.getId(),
-                                            dsm.getClass().getName(),
-                                            Persistence.getPersistenceUtil().isLoaded(dsm, "dataset")
-                                        );
-                                    }
-                                    dsm.setPackageFamilies(new HashSet<String>());
-
-                                    dsm.getEdits()
-                                       .stream()
-                                       .forEach( 
-                                            e -> {
-                                                e.setDatasetMetrics(null); 
-                                                e.getDatasource().setDatasets(null);
-                                                e.getDatasource().setEdits(null);
-                                            }
-                                       );
-                                    //dsm.getDataset().setDatasources(new HashSet<Datasource>());
-                                    dsm.getDataset()
-                                       .getDatasources()
-                                       .stream()
-                                       .forEach(
-                                            e -> {
-                                                e.setDatasets(null);
-                                                e.setEdits(null);
-                                                e.setPackageIndexes(null);
-                                            }
-                                       );
-                                    
-                                }
-                            );
-
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // DatasetMetricsDTO has NO edits - just scalar fields and dataset_id FK
+                    var dsmPage = jdbcQueryService.query("datasetmetrics", params, pageable);
+                    log.info("JDBC query returned {} dataset metrics", dsmPage.getTotalElements());
                     return Map.of(titlePageName, dsmPage);
                     
                 case "DATASET":
-                    builder = queryDslHelpers.getBuilder(params, QDataset.dataset, Dataset.class);
-                    var dPage = datasetRepository.findAll(builder, pageable);
-
-                    // to prevent recursive references that cause things to go boom
-                    dPage.stream()
-                        .forEach(
-                            d -> {
-                                d.getDatasources()
-                                .stream()
-                                .forEach(ds -> {ds.getDatasets().clear(); ds.getEdits().clear();});
-                
-                            }
-                        );
-
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // This returns DatasetDTO (flat, no relationships) instead of Dataset entity
+                    var dPage = jdbcQueryService.query("dataset", params, pageable);
+                    log.info("JDBC query returned {} results for dataset", dPage.getTotalElements());
                     return Map.of(titlePageName, dPage);
                 case "DATASOURCEEVENT":
-                    builder = queryDslHelpers.getBuilder(params, QDatasourceEvent.datasourceEvent, DatasourceEvent.class);
-                    var dsePage = datasourceEventRepository.findAll(builder, pageable);
-
-                    // to prevent recursive reference that cause things to go boom 
-                    dsePage.stream()
-                            .forEach(
-                                dse -> {
-                                    if (dse.getDatasource().getDatasets() != null) {
-                                        dse.getDatasource().getDatasets().clear();
-                                    }
-                                    
-                                    if (dse.getDatasource().getEdits() != null) {
-                                        dse.getDatasource().getEdits().clear();
-                                    }
-                                    
-                                    try {
-                                        dse.setPayload(new byte[1]);
-                                    } catch (IOException e) {
-                                        // TODO Auto-generated catch block
-                                        e.printStackTrace();
-                                    }
-                                    //dse.getPackages().clear();
-                                    dse.getPackages().stream().forEach(p -> {
-                                        p.getDatasourceEvents().clear();
-                                        p.getFindings().stream().forEach(f -> {
-                                            f.getPackages().clear();
-                                            f.getReporters().stream().forEach(r -> r.getFindings().clear());
-                                            f.getData().setFinding(null);
-                                        });
-                                        p.getCriticalFindings().stream().forEach(f -> {
-                                            f.getPackages().clear();
-                                            f.getReporters().stream().forEach(r -> r.getFindings().clear());
-                                            f.getData().setFinding(null);
-                                        });
-                                        p.getHighFindings().stream().forEach(f -> {
-                                            f.getPackages().clear();
-                                            f.getReporters().stream().forEach(r -> r.getFindings().clear());
-                                            f.getData().setFinding(null);
-                                        });
-                                        p.getMediumFindings().stream().forEach(f -> {
-                                            f.getPackages().clear();
-                                            f.getReporters().stream().forEach(r -> r.getFindings().clear());
-                                            f.getData().setFinding(null);
-                                        });
-                                        p.getLowFindings().stream().forEach(f -> {
-                                            f.getPackages().clear();
-                                            f.getReporters().stream().forEach(r -> r.getFindings().clear());
-                                            f.getData().setFinding(null);
-                                        });
-                                    });
-                                }
-                            );
-
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // DatasourceEventDTO has NO packages - just scalar fields
+                    var dsePage = jdbcQueryService.query("datasourceevent", params, pageable);
+                    log.info("JDBC query returned {} datasource events", dsePage.getTotalElements());
                     return Map.of(titlePageName, dsePage);
                 case "DATASOURCE":
-                    builder = queryDslHelpers.getBuilder(params, QDatasource.datasource, Datasource.class);
-                    var dsPage = datasourceRepository.findAll(builder, pageable);
-
-                    // to prevent recursive reference that cause things to go boom 
-                    dsPage.stream()
-                        .forEach(
-                            ds -> {
-                                ds.getDatasets().stream().forEach(d -> d.getDatasources().clear());
-                                ds.getEdits().stream().forEach(e -> {
-                                        e.setDatasetMetrics(null);
-                                        e.setDatasource(null);
-                                });
-                            }
-                        );
-
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // DatasourceDTO has NO edits, NO datasets, NO packageIndexes
+                    var dsPage = jdbcQueryService.query("datasource", params, pageable);
+                    log.info("JDBC query returned {} datasources", dsPage.getTotalElements());
                     return Map.of(titlePageName, dsPage);
                 case "EDIT":
-                    builder = queryDslHelpers.getBuilder(params, QEdit.edit, Edit.class);
-                    var editPage = editRepository.findAll(builder, pageable);
-
-                    // to prevent recursive reference that cause things to go boom 
-                    editPage.stream()
-                            .forEach(
-                                e -> {
-
-                                    // these only seem to be null when there is a chain of calls that results in 
-                                    // a query with an edit.id constraint 
-                                    if ( e.getDatasetMetrics() != null ) {
-                                        e.getDatasetMetrics().getDataset().getDatasources().clear();
-                                        e.getDatasetMetrics().getEdits().clear();
-                                    }
-
-                                    if (e.getDatasource() != null && e.getDatasource().getEdits() != null ) {
-                                        e.getDatasource().getEdits().clear();
-                                    }
-                                    
-                                }
-                            );
-
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // EditDTO has NO datasetMetrics, NO datasource - just scalar fields and FK IDs
+                    var editPage = jdbcQueryService.query("edit", params, pageable);
+                    log.info("JDBC query returned {} edits", editPage.getTotalElements());
                     return Map.of(titlePageName, editPage);
                 case "FINDINGDATA":
-                    builder = queryDslHelpers.getBuilder(params, QFindingData.findingData, FindingData.class);
-                    var findingDataPage = findingDataRepository.findAll(builder, pageable);
-
-                    // to prevent recursive reference that cause things to go boom 
-                    findingDataPage.stream()
-                                .forEach(
-                                        fd -> {
-                                            fd.getFinding().getPackages().clear();
-                                            fd.getFinding().getReporters().stream().forEach(fr -> fr.getFindings().clear());
-                                            fd.getFinding().setData(null);
-                                        }
-                                );
-
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // FindingDataDTO has NO finding - just scalar fields and finding_id FK
+                    var findingDataPage = jdbcQueryService.query("findingdata", params, pageable);
+                    log.info("JDBC query returned {} finding data records", findingDataPage.getTotalElements());
                     return Map.of(titlePageName, findingDataPage);
                 case "FINDINGREPORTER":
-                    builder = queryDslHelpers.getBuilder(params, QFindingReporter.findingReporter, FindingReporter.class);
-                    var findingReporterPage = findingReporterRepository.findAll(builder, pageable);
-
-                    // to prevent recursive reference that cause things to go boom 
-                    findingReporterPage.stream()
-                                    .forEach(
-                                            fr -> {
-                                                fr.getFindings().stream().forEach(f -> {
-                                                    f.getPackages().clear();
-                                                    f.getReporters().clear();
-                                                    f.setData(null);
-                                                });
-                                            }
-                                    );
-
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // FindingReporterDTO has NO findings - just id and name
+                    var findingReporterPage = jdbcQueryService.query("findingreporter", params, pageable);
+                    log.info("JDBC query returned {} finding reporters", findingReporterPage.getTotalElements());
                     return Map.of(titlePageName, findingReporterPage);            
                 case "FINDING":
-                    builder = queryDslHelpers.getBuilder(params, QFinding.finding, Finding.class);
-                    var findingPage = findingRepository.findAll(builder, pageable);
-
-                    // to prevent recursive reference that cause things to go boom 
-                    findingPage.stream()
-                            .forEach(
-                                f -> {
-                                        f.getReporters().stream().forEach(fr -> fr.getFindings().clear());
-                                        f.getData().setFinding(null);
-                                        f.getPackages().stream().forEach(p -> {
-                                            p.getFindings().clear();
-                                            p.getCriticalFindings().clear();
-                                            p.getHighFindings().clear();
-                                            p.getMediumFindings().clear();
-                                            p.getLowFindings().clear();
-                                            p.getDatasourceEvents().clear();
-                                        });
-                                }
-                            );
-
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // FindingDTO JOINs with finding_data, has NO packages, NO reporters
+                    var findingPage = jdbcQueryService.query("finding", params, pageable);
+                    log.info("JDBC query returned {} findings", findingPage.getTotalElements());
                     return Map.of(titlePageName, findingPage);               
                 case "PACKAGE":
-                    builder = queryDslHelpers.getBuilder(params, QPackage.package$, io.patchfox.db_entities.entities.Package.class);
-                    
-                    // unpaged because we need to get all the results in one go - then deduplicate
-                    // MAX_VALUE because Pageable.unpaged is sending us down a codepath that causes predicates not to be processed correctly
-                    // and I am not into debugging that shit rn
-                    var packagePage = packageRepository.findAll(builder, PageRequest.of(0, Integer.MAX_VALUE)); //Pageable.unpaged());
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // PackageDTO has NO findings, NO datasourceEvents - just scalar fields
 
-                    var reDuplicatedPackages = new ArrayList<io.patchfox.db_entities.entities.Package>();
+                    // For re-duplication case (when indexesCollection is provided)
                     if (indexesCollection.length > 0) {
                         var indexes = indexesCollection[0];
-                        packagePage.getContent().stream().forEach( p -> {
-                            var count = indexes.get(p.getId());
-                            LongStream.range(0L, count).forEach( i -> {
 
-                                //to prevent recursive references that cause things to go boom
-                                p.getDatasourceEvents().clear(); 
-                                p.getFindings().stream().forEach(
-                                        f -> {
-                                            f.getPackages().clear();
-                                            f.getReporters().stream().forEach(fr -> fr.getFindings().clear());
-                                            f.getData().setFinding(null);
-                                        }
-                                    ); 
- 
-                                p.getCriticalFindings().clear();
-                                p.getHighFindings().clear();
-                                p.getMediumFindings().clear();
-                                p.getLowFindings().clear();  
+                        // Query all packages matching the criteria (unpaged for re-duplication)
+                        var jdbcPackagePage = jdbcQueryService.query(
+                            "package",
+                            params,
+                            PageRequest.of(0, Integer.MAX_VALUE)
+                        );
 
-                                reDuplicatedPackages.add(p);
-                            });
+                        // Re-duplicate packages based on index counts
+                        var reDuplicatedPackages = new ArrayList<PackageDTO>();
+                        jdbcPackagePage.getContent().forEach(p -> {
+                            PackageDTO pkg = (PackageDTO) p;
+                            var count = indexes.get(pkg.getId());
+                            if (count != null) {
+                                LongStream.range(0L, count).forEach(i -> {
+                                    reDuplicatedPackages.add(pkg);
+                                });
+                            }
                         });
-                        log.info("reDuplicatedPackages size is: {}", reDuplicatedPackages.size());
-                        log.info("reDuplicatedPackages is: {}", reDuplicatedPackages);
 
-                        // Calculate new pagination based on duplicated results
+                        log.info("reDuplicatedPackages size is: {}", reDuplicatedPackages.size());
+
+                        // Manual pagination on re-duplicated results
                         int totalDuplicatedSize = reDuplicatedPackages.size();
                         int pageSize = pageable.getPageSize();
                         int requestedPage = pageable.getPageNumber();
-
-                        // If the requested page is beyond what we have, go to the last valid page
                         int maxPage = Math.max(0, (totalDuplicatedSize - 1) / pageSize);
                         int actualPage = Math.min(requestedPage, maxPage);
-
                         int start = actualPage * pageSize;
                         int end = Math.min(start + pageSize, totalDuplicatedSize);
 
-                        log.info("start is: {}  end is: {}", start, end);
-
-                        List<io.patchfox.db_entities.entities.Package> pageContent = 
-                            start < totalDuplicatedSize 
-                            ? reDuplicatedPackages.subList(start, end) 
+                        List<PackageDTO> pageContent = start < totalDuplicatedSize
+                            ? reDuplicatedPackages.subList(start, end)
                             : Collections.emptyList();
 
-                        log.info("pageContent is: {}", pageContent);
-
-                        // Create new pageable with the actual page we're returning
                         Pageable actualPageable = PageRequest.of(actualPage, pageSize, pageable.getSort());
+                        Page<PackageDTO> packagePage = new PageImpl<>(pageContent, actualPageable, totalDuplicatedSize);
 
-                        packagePage = new PageImpl<>(
-                            pageContent, 
-                            actualPageable, 
-                            totalDuplicatedSize  
-                        );
-
+                        return Map.of(titlePageName, packagePage);
                     } else {
-                        // to prevent recursive references that cause things to go boom
-                        packagePage.stream()
-                                   .forEach(
-                                        p -> {
-                                            p.getDatasourceEvents().clear(); 
-                                            p.getFindings().stream().forEach(
-                                                    f -> {
-                                                        f.getPackages().clear();
-                                                        f.getReporters().stream().forEach(fr -> fr.getFindings().clear());
-                                                        f.getData().setFinding(null);
-                                                    }
-                                                ); 
-
-                                            
-                                            p.getCriticalFindings().clear();
-                                            p.getHighFindings().clear();
-                                            p.getMediumFindings().clear();
-                                            p.getLowFindings().clear();     
-                                            }
-                                    );
-
-                        // Calculate new pagination based on new results
-                        int totalSize = packagePage.getContent().size();
-                        int pageSize = pageable.getPageSize();
-                        int requestedPage = pageable.getPageNumber();
-
-                        // If the requested page is beyond what we have, go to the last valid page
-                        int maxPage = Math.max(0, (totalSize - 1) / pageSize);
-                        int actualPage = Math.min(requestedPage, maxPage);
-
-                        int start = actualPage * pageSize;
-                        int end = Math.min(start + pageSize, totalSize);
-
-                        List<io.patchfox.db_entities.entities.Package> pageContent = 
-                            start < totalSize 
-                            ? packagePage.getContent().subList(start, end) 
-                            : Collections.emptyList();
-
-                        // Create new pageable with the actual page we're returning
-                        Pageable actualPageable = PageRequest.of(actualPage, pageSize, pageable.getSort());
-                        
-                        packagePage = new PageImpl<>(
-                            pageContent, 
-                            actualPageable, 
-                            totalSize  
-                        );
-                    }
-
-                    return Map.of(titlePageName, packagePage);  
+                        // Simple case - just query with JDBC and return
+                        var packagePage = jdbcQueryService.query("package", params, pageable);
+                        log.info("JDBC query returned {} packages", packagePage.getTotalElements());
+                        return Map.of(titlePageName, packagePage);
+                    }  
                 case "DATASOURCEMETRICS":
-                    builder = queryDslHelpers.getBuilder(params, QDatasourceMetrics.datasourceMetrics, DatasourceMetrics.class);
-                    var datasourceMetricsPage = datasourceMetricsRepository.findAll(builder, pageable);
+                    var dsMetricsBuilder = queryDslHelpers.getBuilder(params, QDatasourceMetrics.datasourceMetrics, DatasourceMetrics.class);
+                    var datasourceMetricsPage = datasourceMetricsRepository.findAll(dsMetricsBuilder, pageable);
                     return Map.of(titlePageName, datasourceMetricsPage);
                 case "DATASOURCEMETRICSCURRENT":
-                    builder = queryDslHelpers.getBuilder(params, QDatasourceMetricsCurrent.datasourceMetricsCurrent, DatasourceMetricsCurrent.class);
-                    var datasourceMetricsCurrentPage = datasourceMetricsCurrentRepository.findAll(builder, pageable);
+                    var dsMetricsCurrentBuilder = queryDslHelpers.getBuilder(params, QDatasourceMetricsCurrent.datasourceMetricsCurrent, DatasourceMetricsCurrent.class);
+                    var datasourceMetricsCurrentPage = datasourceMetricsCurrentRepository.findAll(dsMetricsCurrentBuilder, pageable);
                     return Map.of(titlePageName, datasourceMetricsCurrentPage);                
                 default:
                     log.error("unexpectedly discovered no matching db object set for table: {}", table);
