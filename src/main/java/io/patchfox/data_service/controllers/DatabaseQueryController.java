@@ -191,19 +191,19 @@ public class DatabaseQueryController {
         var optionalRv = validateDsmArguments(txid, requestReceivedAt, params);
         if (optionalRv.isPresent()) { return optionalRv.get(); }
 
-        if ( 
-            !params.keySet().contains(EDIT_DATASOURCES_PURL_KEY) 
+        if (
+            !params.keySet().contains(EDIT_DATASOURCES_PURL_KEY)
             || params.get(EDIT_DATASOURCES_PURL_KEY).isBlank()
-            || params.get(EDIT_DATASOURCES_PURL_KEY).length() > 512
+            || (params.get(EDIT_DATASOURCES_PURL_KEY).length() > 512 && !params.get(EDIT_DATASOURCES_PURL_KEY).equals("*"))
         ) {
             log.warn("missing required query string parameter: %s", EDIT_DATASOURCES_PURL_KEY);
             var rv = ApiResponse.builder()
                                 .txid(txid)
                                 .requestReceivedAt(requestReceivedAt)
                                 .code(HttpStatus.BAD_REQUEST.value())
-                                .serverMessage(String.format("missing required query string parameter: {} missing", EDIT_DATASOURCES_PURL_KEY))
-                                .build();            
-                        
+                                .serverMessage(String.format("missing required query string parameter: %s missing", EDIT_DATASOURCES_PURL_KEY))
+                                .build();
+
             return ResponseEntity.status(rv.getCode()).body(rv);
         }
 
@@ -223,19 +223,19 @@ public class DatabaseQueryController {
         var optionalRv = validateDsmArguments(txid, requestReceivedAt, params);
         if (optionalRv.isPresent()) { return optionalRv.get(); }
 
-        if ( 
-            !params.keySet().contains(EDIT_DATASOURCES_PURL_KEY) 
+        if (
+            !params.keySet().contains(EDIT_DATASOURCES_PURL_KEY)
             || params.get(EDIT_DATASOURCES_PURL_KEY).isBlank()
-            || params.get(EDIT_DATASOURCES_PURL_KEY).length() > 512
+            || (params.get(EDIT_DATASOURCES_PURL_KEY).length() > 512 && !params.get(EDIT_DATASOURCES_PURL_KEY).equals("*"))
         ) {
             log.warn("missing required query string parameter: %s", EDIT_DATASOURCES_PURL_KEY);
             var rv = ApiResponse.builder()
                                 .txid(txid)
                                 .requestReceivedAt(requestReceivedAt)
                                 .code(HttpStatus.BAD_REQUEST.value())
-                                .serverMessage(String.format("missing required query string parameter: {} missing", EDIT_DATASOURCES_PURL_KEY))
-                                .build();            
-                        
+                                .serverMessage(String.format("missing required query string parameter: %s missing", EDIT_DATASOURCES_PURL_KEY))
+                                .build();
+
             return ResponseEntity.status(rv.getCode()).body(rv);
         }
 
@@ -255,19 +255,19 @@ public class DatabaseQueryController {
         var optionalRv = validateDsmArguments(txid, requestReceivedAt, params);
         if (optionalRv.isPresent()) { return optionalRv.get(); }
 
-        if ( 
-            !params.keySet().contains(EDIT_DATASOURCES_PURL_KEY) 
+        if (
+            !params.keySet().contains(EDIT_DATASOURCES_PURL_KEY)
             || params.get(EDIT_DATASOURCES_PURL_KEY).isBlank()
-            || params.get(EDIT_DATASOURCES_PURL_KEY).length() > 512
+            || (params.get(EDIT_DATASOURCES_PURL_KEY).length() > 512 && !params.get(EDIT_DATASOURCES_PURL_KEY).equals("*"))
         ) {
             log.warn("missing required query string parameter: %s", EDIT_DATASOURCES_PURL_KEY);
             var rv = ApiResponse.builder()
                                 .txid(txid)
                                 .requestReceivedAt(requestReceivedAt)
                                 .code(HttpStatus.BAD_REQUEST.value())
-                                .serverMessage(String.format("missing required query string parameter: {} missing", EDIT_DATASOURCES_PURL_KEY))
-                                .build();            
-                        
+                                .serverMessage(String.format("missing required query string parameter: %s missing", EDIT_DATASOURCES_PURL_KEY))
+                                .build();
+
             return ResponseEntity.status(rv.getCode()).body(rv);
         }
 

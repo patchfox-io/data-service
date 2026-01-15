@@ -229,11 +229,15 @@ public class DatabaseQueryService {
         // Using JDBC - DatasetMetricsDTO has no edits relationship, load via helper
         var dsmIds = dsmRecords.stream().map(DatasetMetricsDTO::getId).toList();
         var editsWithPurl = jdbcQueryService.getEditsWithDatasourcePurl(dsmIds);
-        var editIndexes = editsWithPurl.stream()
-                                       .filter(ewp -> datasourcePurls.stream()
-                                                                     .anyMatch(p -> ewp.datasourcePurl.contains(p)))
-                                       .map(ewp -> ewp.editId)
-                                       .toList();
+
+        // If wildcard "*" is provided, include all edits; otherwise filter by datasourcePurls
+        var editIndexes = "*".equals(datasourcesPurlValue)
+            ? editsWithPurl.stream().map(ewp -> ewp.editId).toList()
+            : editsWithPurl.stream()
+                           .filter(ewp -> datasourcePurls.stream()
+                                                         .anyMatch(p -> ewp.datasourcePurl.contains(p)))
+                           .map(ewp -> ewp.editId)
+                           .toList();
 
         log.info("size of editIndexes is: {}", editIndexes.size());
 
@@ -403,12 +407,19 @@ public class DatabaseQueryService {
         // Using JDBC - DatasetMetricsDTO has no edits relationship, load via helper
         var dsmIds = dsmRecords.stream().map(DatasetMetricsDTO::getId).toList();
         var editsWithPurl = jdbcQueryService.getEditsWithDatasourcePurl(dsmIds);
-        var commitDateTimes = editsWithPurl.stream()
-                      .filter(ewp -> datasourcePurls.stream()
-                                                    .anyMatch(p -> ewp.datasourcePurl.contains(p)))
-                      .map(ewp -> ewp.commitDateTime)
-                      .filter(cdt -> cdt != null)
-                      .toList();
+
+        // If wildcard "*" is provided, include all edits; otherwise filter by datasourcePurls
+        var commitDateTimes = "*".equals(datasourcesPurlValue)
+            ? editsWithPurl.stream()
+                          .map(ewp -> ewp.commitDateTime)
+                          .filter(cdt -> cdt != null)
+                          .toList()
+            : editsWithPurl.stream()
+                          .filter(ewp -> datasourcePurls.stream()
+                                                        .anyMatch(p -> ewp.datasourcePurl.contains(p)))
+                          .map(ewp -> ewp.commitDateTime)
+                          .filter(cdt -> cdt != null)
+                          .toList();
 
         var commitDateTimesAsString = commitDateTimes.stream()
                                                      .map(String::valueOf)
@@ -579,12 +590,19 @@ public class DatabaseQueryService {
         // Using JDBC - DatasetMetricsDTO has no edits relationship, load via helper
         var dsmIds = dsmRecords.stream().map(DatasetMetricsDTO::getId).toList();
         var editsWithPurl = jdbcQueryService.getEditsWithDatasourcePurl(dsmIds);
-        var commitDateTimes = editsWithPurl.stream()
-                      .filter(ewp -> datasourcePurls.stream()
-                                                    .anyMatch(p -> ewp.datasourcePurl.contains(p)))
-                      .map(ewp -> ewp.commitDateTime)
-                      .filter(cdt -> cdt != null)
-                      .toList();
+
+        // If wildcard "*" is provided, include all edits; otherwise filter by datasourcePurls
+        var commitDateTimes = "*".equals(datasourcesPurlValue)
+            ? editsWithPurl.stream()
+                          .map(ewp -> ewp.commitDateTime)
+                          .filter(cdt -> cdt != null)
+                          .toList()
+            : editsWithPurl.stream()
+                          .filter(ewp -> datasourcePurls.stream()
+                                                        .anyMatch(p -> ewp.datasourcePurl.contains(p)))
+                          .map(ewp -> ewp.commitDateTime)
+                          .filter(cdt -> cdt != null)
+                          .toList();
 
         var commitDateTimesAsString = commitDateTimes.stream()
                                                      .map(String::valueOf)
