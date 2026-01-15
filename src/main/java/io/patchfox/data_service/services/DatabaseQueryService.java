@@ -219,7 +219,7 @@ public class DatabaseQueryService {
         }
         // we assume controller has validated this argument is present
         // this is an Edit obj key, not a DatasetMetrics key so we'll pull it out now
-        var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY);
+        var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY).trim();
 
         List<String> datasourcePurls = Arrays.stream(datasourcesPurlValue.split(","))
                                              .map(String::trim)
@@ -397,7 +397,7 @@ public class DatabaseQueryService {
         }
         // we assume controller has validated this argument is present
         // this is an Edit obj key, not a DatasetMetrics key so we'll pull it out now
-        var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY);
+        var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY).trim();
 
         List<String> datasourcePurls = Arrays.stream(datasourcesPurlValue.split(","))
                                              .map(String::trim)
@@ -580,7 +580,7 @@ public class DatabaseQueryService {
         }
         // we assume controller has validated this argument is present
         // this is an Edit obj key, not a DatasetMetrics key so we'll pull it out now
-        var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY);
+        var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY).trim();
 
         List<String> datasourcePurls = Arrays.stream(datasourcesPurlValue.split(","))
                                              .map(String::trim)
@@ -592,6 +592,7 @@ public class DatabaseQueryService {
         var editsWithPurl = jdbcQueryService.getEditsWithDatasourcePurl(dsmIds);
 
         // If wildcard "*" is provided, include all edits; otherwise filter by datasourcePurls
+        log.info("datasourcesPurlValue: '{}', checking if equals '*': {}", datasourcesPurlValue, "*".equals(datasourcesPurlValue));
         var commitDateTimes = "*".equals(datasourcesPurlValue)
             ? editsWithPurl.stream()
                           .map(ewp -> ewp.commitDateTime)
@@ -604,11 +605,19 @@ public class DatabaseQueryService {
                           .filter(cdt -> cdt != null)
                           .toList();
 
+        log.info("size of commitDateTimes is: {}", commitDateTimes.size());
+
         var commitDateTimesAsString = commitDateTimes.stream()
                                                      .map(String::valueOf)
                                                      .collect(Collectors.joining(","));
 
-        params.put(COMMIT_DATE_TIME_KEY, commitDateTimesAsString);
+        // Safety check - if empty, query all datasourceEvents for this dataset
+        if (commitDateTimes.isEmpty()) {
+            log.warn("No commitDateTimes found, removing COMMIT_DATE_TIME_KEY filter");
+            params.remove(COMMIT_DATE_TIME_KEY);
+        } else {
+            params.put(COMMIT_DATE_TIME_KEY, commitDateTimesAsString);
+        }
         var mappedResult = getMappedResult(txid, requestReceivedAt, "datasourceEvent", params, pageable);
 
 
@@ -685,7 +694,7 @@ public class DatabaseQueryService {
     ) {
         // we assume controller has validated this argument is present
         // this is an Edit obj key, not a DatasetMetrics key so we'll pull it out now
-        var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY);
+        var datasourcesPurlValue = params.get(DatabaseQueryController.EDIT_DATASOURCES_PURL_KEY).trim();
 
         List<String> datasourcePurls = Arrays.stream(datasourcesPurlValue.split(","))
                                              .map(String::trim)
@@ -696,6 +705,11 @@ public class DatabaseQueryService {
 
         if (dsmRecords.isEmpty()) {
             return new ArrayList<>();
+        }
+
+        // If wildcard "*" is provided, return all datasetMetrics without filtering
+        if ("*".equals(datasourcesPurlValue)) {
+            return dsmRecords;
         }
 
         // Using JDBC - DatasetMetricsDTO has datasetId but no datasources relationship

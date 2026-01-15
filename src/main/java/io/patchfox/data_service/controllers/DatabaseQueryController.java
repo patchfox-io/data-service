@@ -74,7 +74,7 @@ public class DatabaseQueryController {
     public static final String DATASOURCE_PACKAGE_QUERY_PATH = API_PATH_PREFIX + "/datasetMetrics/datasource/package/query";
     public static final String GET_DATASOURCE_PACKAGE_QUERY_SIGNATURE = "GET_" + DATASOURCE_PACKAGE_QUERY_PATH;
 
-    public static final String DATASOURCE_PACKAGE_FINDING_QUERY_PATH = API_PATH_PREFIX + "/datasetMetrics/datasource/package/finding/query";
+    public static final String DATASOURCE_PACKAGE_FINDING_QUERY_PATH = API_PATH_PREFIX + "/datasetMetrics/datasource/package/findingType/query";
     public static final String GET_DATASOURCE_PACKAGE_FINDING_QUERY_SIGNATURE = "GET_" + DATASOURCE_PACKAGE_FINDING_QUERY_PATH;    
 
 
