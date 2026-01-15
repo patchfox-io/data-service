@@ -45,6 +45,7 @@
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/helpers/RestHelper.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/json/DatasourceEventView.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/controllers/DatasourceEventController.java
+/home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/dto/DatasourceMetricsCurrentDTO.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/controllers/RestInfoController.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/dto/FindingReporterDTO.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/json/TrackDoubleView.java
@@ -54,6 +55,7 @@
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/config/RepositoryRestConfig.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/dto/DatasourceEventDTO.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/helpers/Validator.java
+/home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/dto/DatasourceMetricsDTO.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/controllers/DatabaseQueryController.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/services/DatabaseQueryService.java
 /home/snerd/patchfox_git/data-service/src/main/java/io/patchfox/data_service/dto/FindingDTO.java

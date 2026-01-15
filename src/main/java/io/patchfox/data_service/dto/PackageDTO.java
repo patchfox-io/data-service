@@ -7,6 +7,8 @@ import java.time.ZonedDateTime;
 
 import org.springframework.jdbc.core.RowMapper;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -35,8 +37,14 @@ public class PackageDTO {
     private int numberMinorVersionsBehindHead;
     private int numberPatchVersionsBehindHead;
     private String mostRecentVersion;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime mostRecentVersionPublishedAt;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime thisVersionPublishedAt;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime updatedAt;
 
     // NO findings - that's the death spiral

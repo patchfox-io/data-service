@@ -20,6 +20,8 @@ import io.patchfox.data_service.dto.DatasetDTO;
 import io.patchfox.data_service.dto.DatasetMetricsDTO;
 import io.patchfox.data_service.dto.DatasourceDTO;
 import io.patchfox.data_service.dto.DatasourceEventDTO;
+import io.patchfox.data_service.dto.DatasourceMetricsDTO;
+import io.patchfox.data_service.dto.DatasourceMetricsCurrentDTO;
 import io.patchfox.data_service.dto.EditDTO;
 import io.patchfox.data_service.dto.FindingDTO;
 import io.patchfox.data_service.dto.FindingDataDTO;
@@ -29,6 +31,8 @@ import io.patchfox.db_entities.entities.Dataset;
 import io.patchfox.db_entities.entities.DatasetMetrics;
 import io.patchfox.db_entities.entities.Datasource;
 import io.patchfox.db_entities.entities.DatasourceEvent;
+import io.patchfox.db_entities.entities.DatasourceMetrics;
+import io.patchfox.db_entities.entities.DatasourceMetricsCurrent;
 import io.patchfox.db_entities.entities.Edit;
 import io.patchfox.db_entities.entities.FindingData;
 import lombok.extern.slf4j.Slf4j;
@@ -164,7 +168,7 @@ public class JdbcQueryService {
                 Map.entry("recommended", "recommended"),
                 Map.entry("datasourceId", "datasource_id")
                 // NOTE: packages deliberately excluded - causes cascade to Package -> Finding death spiral
-                // NOTE: payload deliberately excluded - large compressed blob
+                // NOTE: payload is included in SELECT but not in field mappings (not used for filtering)
             )
         ));
 
@@ -229,6 +233,59 @@ public class JdbcQueryService {
                 Map.entry("reportedAt", "reported_at"),
                 Map.entry("publishedAt", "published_at")
                 // NOTE: finding relationship excluded - causes cascade to packages
+            )
+        ));
+
+        // DatasourceMetrics table metadata
+        TABLES.put("datasourcemetrics", new TableMetadata(
+            "datasource_metrics",
+            DatasourceMetrics.class,
+            Map.ofEntries(
+                Map.entry("id", "id"),
+                Map.entry("datasourceEventCount", "datasource_event_count"),
+                Map.entry("commitDateTime", "commit_date_time"),
+                Map.entry("eventDateTime", "event_date_time"),
+                Map.entry("txid", "txid"),
+                Map.entry("jobId", "job_id"),
+                Map.entry("purl", "purl"),
+                Map.entry("totalFindings", "total_findings"),
+                Map.entry("criticalFindings", "critical_findings"),
+                Map.entry("highFindings", "high_findings"),
+                Map.entry("mediumFindings", "medium_findings"),
+                Map.entry("lowFindings", "low_findings"),
+                Map.entry("packages", "packages"),
+                Map.entry("packagesWithFindings", "packages_with_findings"),
+                Map.entry("downlevelPackages", "downlevel_packages"),
+                Map.entry("stalePackages", "stale_packages"),
+                Map.entry("patches", "patches"),
+                Map.entry("patchEfficacyScore", "patch_efficacy_score")
+                // NOTE: scalar fields only - no relationships
+            )
+        ));
+
+        // DatasourceMetricsCurrent table metadata
+        TABLES.put("datasourcemetricscurrent", new TableMetadata(
+            "datasource_metrics_current",
+            DatasourceMetricsCurrent.class,
+            Map.ofEntries(
+                Map.entry("id", "id"),
+                Map.entry("datasourceEventCount", "datasource_event_count"),
+                Map.entry("commitDateTime", "commit_date_time"),
+                Map.entry("eventDateTime", "event_date_time"),
+                Map.entry("txid", "txid"),
+                Map.entry("jobId", "job_id"),
+                Map.entry("purl", "purl"),
+                Map.entry("totalFindings", "total_findings"),
+                Map.entry("criticalFindings", "critical_findings"),
+                Map.entry("highFindings", "high_findings"),
+                Map.entry("mediumFindings", "medium_findings"),
+                Map.entry("lowFindings", "low_findings"),
+                Map.entry("packages", "packages"),
+                Map.entry("packagesWithFindings", "packages_with_findings"),
+                Map.entry("downlevelPackages", "downlevel_packages"),
+                Map.entry("stalePackages", "stale_packages"),
+                Map.entry("patches", "patches")
+                // NOTE: scalar fields only - no relationships
             )
         ));
     }
@@ -478,6 +535,8 @@ public class JdbcQueryService {
             case "datasetmetrics" -> (RowMapper<T>) DatasetMetricsDTO.ROW_MAPPER;
             case "datasource" -> (RowMapper<T>) DatasourceDTO.ROW_MAPPER;
             case "datasourceevent" -> (RowMapper<T>) DatasourceEventDTO.ROW_MAPPER;
+            case "datasourcemetrics" -> (RowMapper<T>) DatasourceMetricsDTO.ROW_MAPPER;
+            case "datasourcemetricscurrent" -> (RowMapper<T>) DatasourceMetricsCurrentDTO.ROW_MAPPER;
             case "edit" -> (RowMapper<T>) EditDTO.ROW_MAPPER;
             case "package" -> (RowMapper<T>) PackageDTO.ROW_MAPPER;
             case "finding" -> (RowMapper<T>) FindingDTO.ROW_MAPPER;
@@ -493,6 +552,8 @@ public class JdbcQueryService {
             case "datasetmetrics" -> DatasetMetricsDTO.SELECT_COLUMNS;
             case "datasource" -> DatasourceDTO.SELECT_COLUMNS;
             case "datasourceevent" -> DatasourceEventDTO.SELECT_COLUMNS;
+            case "datasourcemetrics" -> DatasourceMetricsDTO.SELECT_COLUMNS;
+            case "datasourcemetricscurrent" -> DatasourceMetricsCurrentDTO.SELECT_COLUMNS;
             case "edit" -> EditDTO.SELECT_COLUMNS;
             case "package" -> PackageDTO.SELECT_COLUMNS;
             case "finding" -> FindingDTO.SELECT_COLUMNS;

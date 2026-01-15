@@ -1,23 +1,34 @@
 package io.patchfox.data_service.dto;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.sql.ResultSet;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.UUID;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
 
 import org.springframework.jdbc.core.RowMapper;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.patchfox.package_utils.data.pkg.PackageWrapper;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * DTO for DatasourceEvent entity - scalar fields only.
  * Excludes packages relationship to prevent cascade explosion.
- * Excludes payload (compressed blob) to keep responses lightweight.
+ * Includes payload (decompressed from database storage and deserialized to PackageWrapper).
  */
+@Slf4j
 @Data
 @Builder
 @NoArgsConstructor
@@ -30,7 +41,11 @@ public class DatasourceEventDTO {
     private UUID jobId;
     private String commitHash;
     private String commitBranch;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime commitDateTime;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime eventDateTime;
     private String status;
     private String processingError;
@@ -43,8 +58,10 @@ public class DatasourceEventDTO {
     // Foreign key reference instead of full entity
     private Long datasourceId;
 
+    // Payload - decompressed from database and deserialized
+    private PackageWrapper packageWrapper;
+
     // NO packages - that's the death spiral to Package -> Finding -> FindingReporter
-    // NO payload - it's a large compressed blob
 
     /**
      * RowMapper for converting JDBC ResultSet to DatasourceEventDTO.
@@ -88,16 +105,48 @@ public class DatasourceEventDTO {
         dto.setRecommended(rs.getBoolean("recommended"));
         dto.setDatasourceId(rs.getLong("datasource_id"));
 
+        // Decompress payload from database and deserialize to PackageWrapper
+        byte[] compressedPayload = rs.getBytes("payload");
+        if (compressedPayload != null && compressedPayload.length > 0) {
+            try {
+                Inflater inflater = new Inflater();
+                inflater.setInput(compressedPayload);
+
+                try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[1024];
+
+                    while (!inflater.finished()) {
+                        int decompressedSize = inflater.inflate(buffer);
+                        outputStream.write(buffer, 0, decompressedSize);
+                    }
+
+                    inflater.end();
+                    byte[] decompressedPayload = outputStream.toByteArray();
+
+                    // Deserialize to PackageWrapper
+                    ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+                    PackageWrapper packageWrapper = mapper.readValue(decompressedPayload, PackageWrapper.class);
+                    dto.setPackageWrapper(packageWrapper);
+                }
+            } catch (IOException | DataFormatException e) {
+                log.error("Failed to decompress/deserialize payload for datasource event id={}", rs.getLong("id"), e);
+                dto.setPackageWrapper(null);
+            }
+        } else {
+            dto.setPackageWrapper(null);
+        }
+
         return dto;
     };
 
     /**
      * Column list for SELECT.
-     * Excludes payload (large compressed blob) and packages relationship.
+     * Includes payload (will be decompressed and deserialized to PackageWrapper in RowMapper).
+     * Excludes packages relationship.
      */
     public static final String SELECT_COLUMNS =
         "id, purl, txid, job_id, commit_hash, commit_branch, " +
         "commit_date_time, event_date_time, status, processing_error, " +
         "oss_enriched, package_index_enriched, analyzed, forecasted, recommended, " +
-        "datasource_id";
+        "datasource_id, payload";
 }

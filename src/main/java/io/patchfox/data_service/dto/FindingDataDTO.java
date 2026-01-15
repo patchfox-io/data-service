@@ -11,6 +11,8 @@ import java.util.Set;
 
 import org.springframework.jdbc.core.RowMapper;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -37,7 +39,10 @@ public class FindingDataDTO {
     @Builder.Default
     private Set<String> cpes = new HashSet<>();
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime reportedAt;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime publishedAt;
 
     @Builder.Default

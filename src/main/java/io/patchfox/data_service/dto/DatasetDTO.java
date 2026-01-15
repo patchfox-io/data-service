@@ -10,6 +10,8 @@ import java.util.UUID;
 
 import org.springframework.jdbc.core.RowMapper;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,6 +31,8 @@ public class DatasetDTO {
     private UUID latestTxid;
     private UUID latestJobId;
     private String name;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime updatedAt;
     private String status;
 

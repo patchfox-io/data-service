@@ -7,6 +7,8 @@ import java.time.ZonedDateTime;
 
 import org.springframework.jdbc.core.RowMapper;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,7 +29,10 @@ public class EditDTO {
     private Long datasetMetricsId;
     private Long datasourceId;
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime commitDateTime;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
     private ZonedDateTime eventDateTime;
 
     private String editType;

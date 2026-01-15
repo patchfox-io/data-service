@@ -1,6 +1,7 @@
 io/patchfox/data_service/services/HealthCheckService.class
 io/patchfox/data_service/services/DatasourceEventService.class
 io/patchfox/data_service/services/TrackViewService.class
+io/patchfox/data_service/dto/DatasourceMetricsDTO.class
 io/patchfox/data_service/json/RecommendTopView$Orientation.class
 io/patchfox/data_service/json/RecommendTopView$Direction.class
 io/patchfox/data_service/helpers/Validator.class
@@ -10,6 +11,7 @@ io/patchfox/data_service/jdbc/SqlWhereBuilder.class
 io/patchfox/data_service/services/DatasourceService$DatasourceRowMapper.class
 io/patchfox/data_service/services/RecommendViewService.class
 io/patchfox/data_service/interceptors/RequestEnrichmentInterceptor.class
+io/patchfox/data_service/dto/DatasourceMetricsCurrentDTO.class
 io/patchfox/data_service/repositories/FindingRepository.class
 io/patchfox/data_service/json/TrackStalePackagesView$Value.class
 io/patchfox/data_service/config/RepositoryRestConfig.class
@@ -33,6 +35,7 @@ io/patchfox/data_service/helpers/RestHelper.class
 io/patchfox/data_service/json/TrackCveSeverityView.class
 io/patchfox/data_service/json/TrackStalePackagesView.class
 io/patchfox/data_service/interceptors/ErrorViewInterceptor.class
+io/patchfox/data_service/dto/DatasourceMetricsDTO$DatasourceMetricsDTOBuilder.class
 io/patchfox/data_service/dto/DatasetDTO$DatasetDTOBuilder.class
 io/patchfox/data_service/dto/DatasetDTO.class
 io/patchfox/data_service/dto/DatasourceDTO$DatasourceDTOBuilder.class
@@ -53,6 +56,7 @@ io/patchfox/data_service/json/TrackCvesAvoidedView$Historical.class
 io/patchfox/data_service/dto/FindingDataDTO.class
 io/patchfox/data_service/kafka/KafkaBeans.class
 io/patchfox/data_service/controllers/RestInfoController.class
+io/patchfox/data_service/dto/DatasourceMetricsCurrentDTO$DatasourceMetricsCurrentDTOBuilder.class
 io/patchfox/data_service/json/TrackCveSeverityView$Value.class
 io/patchfox/data_service/json/RecommendTopView$TopCard.class
 io/patchfox/data_service/controllers/HealthCheckController.class

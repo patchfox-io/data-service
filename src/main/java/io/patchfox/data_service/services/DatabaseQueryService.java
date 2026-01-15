@@ -899,7 +899,7 @@ public class DatabaseQueryService {
                     return Map.of(titlePageName, dPage);
                 case "DATASOURCEEVENT":
                     // Use JDBC to bypass Hibernate relationship loading explosion
-                    // DatasourceEventDTO has NO packages - just scalar fields
+                    // DatasourceEventDTO has NO packages - just scalar fields (includes payload)
                     var dsePage = jdbcQueryService.query("datasourceevent", params, pageable);
                     log.info("JDBC query returned {} datasource events", dsePage.getTotalElements());
                     return Map.of(titlePageName, dsePage);
@@ -986,13 +986,17 @@ public class DatabaseQueryService {
                         return Map.of(titlePageName, packagePage);
                     }  
                 case "DATASOURCEMETRICS":
-                    var dsMetricsBuilder = queryDslHelpers.getBuilder(params, QDatasourceMetrics.datasourceMetrics, DatasourceMetrics.class);
-                    var datasourceMetricsPage = datasourceMetricsRepository.findAll(dsMetricsBuilder, pageable);
-                    return Map.of(titlePageName, datasourceMetricsPage);
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // DatasourceMetricsDTO has NO relationships - just scalar fields
+                    var dsMetricsPage = jdbcQueryService.query("datasourcemetrics", params, pageable);
+                    log.info("JDBC query returned {} datasource metrics", dsMetricsPage.getTotalElements());
+                    return Map.of(titlePageName, dsMetricsPage);
                 case "DATASOURCEMETRICSCURRENT":
-                    var dsMetricsCurrentBuilder = queryDslHelpers.getBuilder(params, QDatasourceMetricsCurrent.datasourceMetricsCurrent, DatasourceMetricsCurrent.class);
-                    var datasourceMetricsCurrentPage = datasourceMetricsCurrentRepository.findAll(dsMetricsCurrentBuilder, pageable);
-                    return Map.of(titlePageName, datasourceMetricsCurrentPage);                
+                    // Use JDBC to bypass Hibernate relationship loading explosion
+                    // DatasourceMetricsCurrentDTO has NO relationships - just scalar fields
+                    var dsMetricsCurrentPage = jdbcQueryService.query("datasourcemetricscurrent", params, pageable);
+                    log.info("JDBC query returned {} datasource metrics current", dsMetricsCurrentPage.getTotalElements());
+                    return Map.of(titlePageName, dsMetricsCurrentPage);
                 default:
                     log.error("unexpectedly discovered no matching db object set for table: {}", table);
                     throw new IllegalArgumentException("unexpectedly discovered no matching db object set for table: " + table);
