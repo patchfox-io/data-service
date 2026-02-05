@@ -499,7 +499,10 @@ public class JdbcQueryService {
             throw new IllegalArgumentException("Unknown table: " + tableName);
         }
 
-        RowMapper<T> rowMapper = getRowMapper(tableName);
+        // Check for excludePayload parameter (default false - payload IS included by default)
+        boolean excludePayload = "true".equalsIgnoreCase(params.remove("excludePayload"));
+
+        RowMapper<T> rowMapper = getRowMapper(tableName, excludePayload);
 
         SqlWhereBuilder whereBuilder = new SqlWhereBuilder(meta);
         String whereClause = whereBuilder.build(params);
@@ -516,7 +519,7 @@ public class JdbcQueryService {
         }
 
         String dataSql = buildDataSql(
-            getSelectColumns(tableName),
+            getSelectColumns(tableName, excludePayload),
             meta.getTableName(),
             whereClause,
             orderBy,
@@ -529,12 +532,13 @@ public class JdbcQueryService {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> RowMapper<T> getRowMapper(String tableName) {
+    private <T> RowMapper<T> getRowMapper(String tableName, boolean excludePayload) {
         return switch (tableName.toLowerCase()) {
             case "dataset" -> (RowMapper<T>) DatasetDTO.ROW_MAPPER;
             case "datasetmetrics" -> (RowMapper<T>) DatasetMetricsDTO.ROW_MAPPER;
             case "datasource" -> (RowMapper<T>) DatasourceDTO.ROW_MAPPER;
-            case "datasourceevent" -> (RowMapper<T>) DatasourceEventDTO.ROW_MAPPER;
+            case "datasourceevent" -> (RowMapper<T>) (excludePayload ? 
+                DatasourceEventDTO.ROW_MAPPER_NO_PAYLOAD : DatasourceEventDTO.ROW_MAPPER);
             case "datasourcemetrics" -> (RowMapper<T>) DatasourceMetricsDTO.ROW_MAPPER;
             case "datasourcemetricscurrent" -> (RowMapper<T>) DatasourceMetricsCurrentDTO.ROW_MAPPER;
             case "edit" -> (RowMapper<T>) EditDTO.ROW_MAPPER;
@@ -546,12 +550,13 @@ public class JdbcQueryService {
         };
     }
 
-    private String getSelectColumns(String tableName) {
+    private String getSelectColumns(String tableName, boolean excludePayload) {
         return switch (tableName.toLowerCase()) {
             case "dataset" -> DatasetDTO.SELECT_COLUMNS;
             case "datasetmetrics" -> DatasetMetricsDTO.SELECT_COLUMNS;
             case "datasource" -> DatasourceDTO.SELECT_COLUMNS;
-            case "datasourceevent" -> DatasourceEventDTO.SELECT_COLUMNS;
+            case "datasourceevent" -> excludePayload ? 
+                DatasourceEventDTO.SELECT_COLUMNS_NO_PAYLOAD : DatasourceEventDTO.SELECT_COLUMNS;
             case "datasourcemetrics" -> DatasourceMetricsDTO.SELECT_COLUMNS;
             case "datasourcemetricscurrent" -> DatasourceMetricsCurrentDTO.SELECT_COLUMNS;
             case "edit" -> EditDTO.SELECT_COLUMNS;

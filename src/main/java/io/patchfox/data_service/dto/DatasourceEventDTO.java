@@ -149,4 +149,59 @@ public class DatasourceEventDTO {
         "commit_date_time, event_date_time, status, processing_error, " +
         "oss_enriched, package_index_enriched, analyzed, forecasted, recommended, " +
         "datasource_id, payload";
+
+    /**
+     * Lightweight column list WITHOUT payload.
+     * Use this for queries that only need metadata (counts, status checks, etc.)
+     */
+    public static final String SELECT_COLUMNS_NO_PAYLOAD =
+        "id, purl, txid, job_id, commit_hash, commit_branch, " +
+        "commit_date_time, event_date_time, status, processing_error, " +
+        "oss_enriched, package_index_enriched, analyzed, forecasted, recommended, " +
+        "datasource_id";
+
+    /**
+     * Lightweight RowMapper WITHOUT payload decompression/deserialization.
+     * Use this for queries that only need metadata.
+     */
+    public static final RowMapper<DatasourceEventDTO> ROW_MAPPER_NO_PAYLOAD = (ResultSet rs, int rowNum) -> {
+        DatasourceEventDTO dto = new DatasourceEventDTO();
+        dto.setId(rs.getLong("id"));
+        dto.setPurl(rs.getString("purl"));
+
+        String txidStr = rs.getString("txid");
+        if (txidStr != null) {
+            dto.setTxid(UUID.fromString(txidStr));
+        }
+
+        String jobIdStr = rs.getString("job_id");
+        if (jobIdStr != null) {
+            dto.setJobId(UUID.fromString(jobIdStr));
+        }
+
+        dto.setCommitHash(rs.getString("commit_hash"));
+        dto.setCommitBranch(rs.getString("commit_branch"));
+
+        OffsetDateTime commitDateTime = rs.getObject("commit_date_time", OffsetDateTime.class);
+        if (commitDateTime != null) {
+            dto.setCommitDateTime(commitDateTime.atZoneSameInstant(ZoneOffset.UTC));
+        }
+
+        OffsetDateTime eventDateTime = rs.getObject("event_date_time", OffsetDateTime.class);
+        if (eventDateTime != null) {
+            dto.setEventDateTime(eventDateTime.atZoneSameInstant(ZoneOffset.UTC));
+        }
+
+        dto.setStatus(rs.getString("status"));
+        dto.setProcessingError(rs.getString("processing_error"));
+        dto.setOssEnriched(rs.getBoolean("oss_enriched"));
+        dto.setPackageIndexEnriched(rs.getBoolean("package_index_enriched"));
+        dto.setAnalyzed(rs.getBoolean("analyzed"));
+        dto.setForecasted(rs.getBoolean("forecasted"));
+        dto.setRecommended(rs.getBoolean("recommended"));
+        dto.setDatasourceId(rs.getLong("datasource_id"));
+        dto.setPackageWrapper(null);
+
+        return dto;
+    };
 }
