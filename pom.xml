@@ -6,13 +6,13 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.2.5</version>
+		<version>3.2.6</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	
 	<groupId>io.patchfox</groupId>
 	<artifactId>data-service</artifactId>
-	<version>0.0.68</version>
+	<version>0.0.69</version>
 	<name>data-service</name>
 	
 	<properties>
@@ -70,7 +70,7 @@
 		<dependency>
   			<groupId>io.patchfox.utils</groupId>
   			<artifactId>package-utils</artifactId>
-  			<version>1.0.10</version>
+  			<version>1.0.11</version>
 		</dependency>
 
 		<dependency>
@@ -124,7 +124,7 @@
 			<plugin>
 				<groupId>com.google.cloud.tools</groupId>
 				<artifactId>jib-maven-plugin</artifactId>
-				<version>3.4.6</version>
+				<version>3.5.1</version>
 				<configuration>
 					<from>
 						<image>eclipse-temurin:21-jre</image>
